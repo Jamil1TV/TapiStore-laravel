@@ -32,7 +32,27 @@ if (!function_exists('getDB')) {
             return $pdo;
         }
 
-        $connection = config('database.connections.mysql');
+        $defaultConnection = config('database.default', 'mysql');
+        $connection = config("database.connections.{$defaultConnection}");
+        $driver = $connection['driver'] ?? 'mysql';
+
+        if ($driver === 'sqlite') {
+            $database = $connection['database'] ?? database_path('database.sqlite');
+
+            if ($database === ':memory:') {
+                return \Illuminate\Support\Facades\DB::connection()->getPdo();
+            }
+
+            $dsn = "sqlite:{$database}";
+            $pdo = new PDO($dsn, null, null, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES => false,
+            ]);
+
+            return $pdo;
+        }
+
         $host = $connection['host'] ?? '127.0.0.1';
         $port = $connection['port'] ?? 3306;
         $database = $connection['database'] ?? 'tapi_ecommerce';
