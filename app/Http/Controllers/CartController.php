@@ -53,53 +53,74 @@ class CartController extends Controller
 
     public function actions(Request $request)
     {
-        if (! isLoggedIn()) {
-            return response()->json(['success' => false, 'message' => 'Please log in first.', 'redirect' => SITE_URL . '/pages/login.php']);
+        try {
+            // Log incoming request for root-cause debugging (non-invasive)
+            \Log::info('Cart actions called', [
+                'isLoggedIn' => isLoggedIn(),
+                'action' => $request->input('action'),
+                'product_id' => $request->input('product_id'),
+                'quantity' => $request->input('quantity'),
+                'method' => $request->method(),
+                'ip' => $request->ip(),
+            ]);
+            if (! isLoggedIn()) {
+                return response()->json(['success' => false, 'message' => 'Please log in first.', 'redirect' => SITE_URL . '/pages/login.php']);
+            }
+
+            $action = $request->input('action', '');
+            $productId = (int)$request->input('product_id', 0);
+            $quantity = max(1, (int)$request->input('quantity', 1));
+            $db = getDB();
+
+            switch ($action) {
+                case 'add':
+                    $prod = $db->prepare("SELECT id, stock_quantity FROM products WHERE id = ? AND status = 'active'");
+                    $prod->execute([$productId]);
+                    $product = $prod->fetch();
+                    if (! $product) {
+                        return response()->json(['success' => false, 'message' => 'Product not found.']);
+                    }
+                    if ($product['stock_quantity'] < 1) {
+                        return response()->json(['success' => false, 'message' => 'Product is out of stock.']);
+                    }
+
+                    $existing = $db->prepare('SELECT id, quantity FROM cart WHERE user_id = ? AND product_id = ?');
+                    $existing->execute([session('user_id'), $productId]);
+                    $cartItem = $existing->fetch();
+                    if ($cartItem) {
+                        $newQty = min($cartItem['quantity'] + $quantity, $product['stock_quantity']);
+                        $db->prepare('UPDATE cart SET quantity = ? WHERE id = ?')->execute([$newQty, $cartItem['id']]);
+                    } else {
+                        $db->prepare('INSERT INTO cart (user_id, product_id, quantity) VALUES (?, ?, ?)')
+                            ->execute([session('user_id'), $productId, min($quantity, $product['stock_quantity'])]);
+                    }
+
+                    return response()->json(['success' => true, 'message' => 'Added to cart!', 'cartCount' => getCartCount()]);
+
+                case 'update':
+                    $db->prepare('UPDATE cart SET quantity = ? WHERE user_id = ? AND product_id = ?')
+                        ->execute([$quantity, session('user_id'), $productId]);
+
+                    return response()->json(['success' => true, 'message' => 'Cart updated.', 'cartCount' => getCartCount()]);
+
+                case 'remove':
+                    $db->prepare('DELETE FROM cart WHERE user_id = ? AND product_id = ?')
+                        ->execute([session('user_id'), $productId]);
+
+                    return response()->json(['success' => true, 'message' => 'Item removed.', 'cartCount' => getCartCount()]);
+            }
+
+            return response()->json(['success' => false, 'message' => 'Invalid action.']);
+        } catch (\Throwable $e) {
+            // Log details for debugging
+            \Log::error('Cart actions error: ' . $e->getMessage(), [
+                'action' => $request->input('action'),
+                'product_id' => $request->input('product_id'),
+                'quantity' => $request->input('quantity'),
+                'user_id' => session('user_id') ?? null,
+            ]);
+
+            return response()->json(['success' => false, 'message' => 'Server error. Please try again.'], 500);
         }
-
-        $action = $request->input('action', '');
-        $productId = (int)$request->input('product_id', 0);
-        $quantity = max(1, (int)$request->input('quantity', 1));
-        $db = getDB();
-
-        switch ($action) {
-            case 'add':
-                $prod = $db->prepare("SELECT id, stock_quantity FROM products WHERE id = ? AND status = 'active'");
-                $prod->execute([$productId]);
-                $product = $prod->fetch();
-                if (! $product) {
-                    return response()->json(['success' => false, 'message' => 'Product not found.']);
-                }
-                if ($product['stock_quantity'] < 1) {
-                    return response()->json(['success' => false, 'message' => 'Product is out of stock.']);
-                }
-
-                $existing = $db->prepare('SELECT id, quantity FROM cart WHERE user_id = ? AND product_id = ?');
-                $existing->execute([session('user_id'), $productId]);
-                $cartItem = $existing->fetch();
-                if ($cartItem) {
-                    $newQty = min($cartItem['quantity'] + $quantity, $product['stock_quantity']);
-                    $db->prepare('UPDATE cart SET quantity = ? WHERE id = ?')->execute([$newQty, $cartItem['id']]);
-                } else {
-                    $db->prepare('INSERT INTO cart (user_id, product_id, quantity) VALUES (?, ?, ?)')
-                        ->execute([session('user_id'), $productId, min($quantity, $product['stock_quantity'])]);
-                }
-
-                return response()->json(['success' => true, 'message' => 'Added to cart!', 'cartCount' => getCartCount()]);
-
-            case 'update':
-                $db->prepare('UPDATE cart SET quantity = ? WHERE user_id = ? AND product_id = ?')
-                    ->execute([$quantity, session('user_id'), $productId]);
-
-                return response()->json(['success' => true, 'message' => 'Cart updated.', 'cartCount' => getCartCount()]);
-
-            case 'remove':
-                $db->prepare('DELETE FROM cart WHERE user_id = ? AND product_id = ?')
-                    ->execute([session('user_id'), $productId]);
-
-                return response()->json(['success' => true, 'message' => 'Item removed.', 'cartCount' => getCartCount()]);
-        }
-
-        return response()->json(['success' => false, 'message' => 'Invalid action.']);
     }
 }
