@@ -110,8 +110,10 @@ Filters accepted by `/api/products`: `q`, `category`, `brand`, `min_price`, `max
 - The included local `.env` uses SQLite so the project can be smoke-tested immediately on machines without MySQL running.
 - Product uploads use `storage/app/public` and are exposed through `public/storage`.
 
-jamil@example.com
+## admin_user
+admin@tapi.com
 Admin@123
 
-admin@tapi.com
-Admin@123"# TapiStore-eommerce" 
+## costumer_user
+jamil@example.com
+jamil@123
