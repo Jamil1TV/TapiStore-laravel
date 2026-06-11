@@ -14,6 +14,8 @@ class Product extends Model
 {
     use SoftDeletes;
 
+    public $timestamps = false;
+
     protected $fillable = [
         'category_id',
         'brand_id',
