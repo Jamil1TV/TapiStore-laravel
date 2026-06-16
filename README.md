@@ -71,8 +71,13 @@ The project `.env` is configured for XAMPP defaults (`root`, no password, databa
 
 ## Demo Accounts
 
-- Admin: `admin@example.com` / `password`
-- Customer: `customer@example.com` / `password`
+# admin_user
+admin@tapi.com
+Admin@123
+
+# costumer_user
+jamil@example.com
+jamil@123
 
 Seeded users are email verified so dashboard/admin flows work immediately.
 
@@ -110,10 +115,4 @@ Filters accepted by `/api/products`: `q`, `category`, `brand`, `min_price`, `max
 - The included local `.env` uses SQLite so the project can be smoke-tested immediately on machines without MySQL running.
 - Product uploads use `storage/app/public` and are exposed through `public/storage`.
 
-## admin_user
-admin@tapi.com
-Admin@123
 
-## costumer_user
-jamil@example.com
-jamil@123
